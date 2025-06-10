@@ -179,7 +179,8 @@ class FeedForward(tf.keras.layers.Layer):
 		config = {**config, **kwargs}
 		return cls(**config)
 
-class TransformerBlock(tf.keras.layers.Layer): # Encoder
+class TransformerBlock(tf.keras.layers.Layer):
+	# Encoder
 	# 포지셔널 인코딩을 포함하지 않음
 	def __init__(self, embadding_dim, dff, heads, drop1=False, drop2=False, **kwargs):
 		super(TransformerBlock, self).__init__(**kwargs)
