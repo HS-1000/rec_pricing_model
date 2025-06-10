@@ -25,7 +25,7 @@ def build_lstm_attention_model(input_shape, lstm_units=64, attention_units=32, d
 	inputs = layers.Input(shape=input_shape)  # shape: (timesteps, num_features)
 	lstm_out = layers.LSTM(lstm_units, return_sequences=True)(inputs)  # (batch_size, timesteps, lstm_units)
 	context_vector = AdditiveAttention(attention_units)(lstm_out)  # (batch_size, lstm_units)
-	x = layers.Dropout(0.2)(context_vector)
+	x = layers.Dropout(0.1)(context_vector)
 	x = layers.Dense(dense_units, activation='relu')(x)
 	output = layers.Dense(1, activation='tanh')(x)
 	model = Model(inputs=inputs, outputs=output)
@@ -244,49 +244,16 @@ class TransformerBlock(tf.keras.layers.Layer): # Encoder
 
 if __name__ == "__main__":
 	inputs = layers.Input(shape=(32, 16))
+	x = layers.LSTM(32, return_sequences=True)(inputs)
 	x = TransformerBlock(
-		embadding_dim = 16,
-		dff = 64,
-		heads = 2,
-		drop1 = 0.05,
-		drop2 = 0.05
-	)(inputs)
-	x = TransformerBlock(
-		embadding_dim = 16,
-		dff = 64,
-		heads = 2,
-		drop1 = 0.05,
-		drop2 = 0.05
-	)(x)
-	x = TransformerBlock(
-		embadding_dim = 16,
-		dff = 64,
-		heads = 2,
-		drop1 = 0.05,
-		drop2 = 0.05
-	)(x)
-	x = TransformerBlock(
-		embadding_dim = 16,
-		dff = 64,
-		heads = 2,
-		drop1 = 0.05,
-		drop2 = 0.05
-	)(x)
-	x = TransformerBlock(
-		embadding_dim = 16,
-		dff = 64,
-		heads = 2,
-		drop1 = 0.05,
-		drop2 = 0.05
-	)(x)
-	x = TransformerBlock(
-		embadding_dim = 16,
-		dff = 64,
-		heads = 2,
+		embadding_dim = 32,
+		dff = 4,
+		heads = 4,
 		drop1 = 0.05,
 		drop2 = 0.05
 	)(x)
 	x = layers.GlobalAveragePooling1D()(x)
+	x = layers.Dense(32)(x)
 	x = layers.Dense(32, activation="relu")(x)
 	outputs = layers.Dense(1, activation="tanh")(x)
 	model = tf.keras.Model(inputs=inputs, outputs=outputs)
