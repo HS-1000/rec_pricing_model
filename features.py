@@ -5,7 +5,7 @@ import numpy as np
 사용할 피처들:
 	A. 시계열
 		1. day-of-year
-		2. months-to-now
+		2. months-to-now (delete)
 	B. REC 현물시장
 		1. 거래량
 		2. 가격
@@ -28,15 +28,10 @@ def date_featrues(date:pd.Series, base_time:pd.Timestamp=None):
 	norm_day = day_of_year / 366
 	day_sin = np.sin(2 * np.pi * norm_day) # 1
 	day_cos = np.cos(2 * np.pi * norm_day) # 2
-	delta = base_time - date
-	months_past = delta.dt.days / 30.44
-	months_past = months_past.clip(lower=0).to_numpy()
-	position = 1 / (1 + np.exp(-6 * (months_past - 0.5))) # 3
 	return pd.DataFrame({
 		"date" : date,
 		"day_sin" : day_sin,
 		"day_cos" : day_cos,
-		"position" : position
 	})
 
 def ema(prices, n):
@@ -76,19 +71,21 @@ def market_features(data:pd.DataFrame):
 	price_min_rol, price_max_rol = rolling_min_max(price_ma7, 30)
 	diff = price_max_rol - price_min_rol
 	diff[0] = 1 # division by zero
-	price_norm = (prices - price_min_rol) / diff # 4
-	price_ma_norm = (price_ma7 - price_min_rol) / diff # 5
+	price_norm = (prices - price_min_rol) / diff # 3
+	price_ma_norm = (price_ma7 - price_min_rol) / diff # 4
 	vol_min_rol, vol_max_rol = rolling_min_max(vol_ma7, 30)
 	diff = vol_max_rol - vol_min_rol
 	diff[0] = 1
-	vol_norm = (volume - vol_min_rol) / diff # 6
-	vol_ma_norm = (vol_ma7 - vol_min_rol) / diff # 7
-	price_std_rate = price_std / prices * 4 # 8
+	vol_norm = (volume - vol_min_rol) / diff # 5
+	vol_ma_norm = (vol_ma7 - vol_min_rol) / diff # 6
+	price_std_rate = price_std / prices * 4 # 7
 	length = len(data)
 	prices_mom = np.full(length, np.nan, dtype=np.float64)
+	prices_qoq = np.full(length, np.nan, dtype=np.float64)
 	prices_yoy = np.full(length, np.nan, dtype=np.float64)
 	day_delta = pd.Timedelta(days=1)
 	month_delta = pd.Timedelta(days=30)
+	quater_delta = pd.Timedelta(days=91)
 	year_delta = pd.Timedelta(days=365)
 	data = data.set_index('date', drop=True)
 	for i, (now_dt, row) in enumerate(data.iterrows()):
@@ -103,6 +100,17 @@ def market_features(data:pd.DataFrame):
 			else:
 				mom_dt -= day_delta
 		prices_mom[i] = (row['price1'] - mom_price) / mom_price
+		qoq_dt = now_dt - quater_delta
+		while True:
+			if qoq_dt <= start_date:
+				qoq_price = data.loc[start_date, 'price1']
+				break
+			if qoq_dt in data.index:
+				qoq_price = data.loc[qoq_dt, 'price1']
+				break
+			else:
+				qoq_dt -= day_delta
+		prices_qoq[i] = (row['price1'] - qoq_price) / qoq_price
 		yoy_dt = now_dt - year_delta
 		while True:
 			if yoy_dt <= start_date:
@@ -114,9 +122,11 @@ def market_features(data:pd.DataFrame):
 			else:
 				yoy_dt -= day_delta
 		prices_yoy[i] = (row['price1'] - yoy_price) / yoy_price
-	prices_mom *= 8
+	prices_mom *= 7
+	prices_qoq *= 4
 	prices_yoy *= 2
-	prices_mom = np.tanh(prices_mom) # 9
+	prices_mom = np.tanh(prices_mom) # 8
+	prices_qoq = np.tanh(prices_qoq) # 9
 	prices_yoy = np.tanh(prices_yoy) # 10
 	return pd.DataFrame({
 		'date' : data.index.to_numpy(),
@@ -126,6 +136,7 @@ def market_features(data:pd.DataFrame):
 		'vol_ma_norm' : vol_ma_norm,
 		'price_std' : price_std_rate,
 		'prices_mom' : prices_mom,
+		'prices_qoq' : prices_qoq,
 		'prices_yoy' : prices_yoy
 	})
 
@@ -138,8 +149,16 @@ def demand_features(data:pd.DataFrame) -> pd.DataFrame:
 	date = pd.to_datetime(data['date']).to_numpy()
 	return_dt = date[365:]
 	demand = data['peak_demand_mw'].to_numpy()
-	demand_ma5 = ema(demand, 5)[365:] # 11
-	demand_ma12 = ema(demand, 12)[365:] # 12
+	demand_ma5 = ema(demand, 5)[365:]
+	dem_ma5_min, dem_ma5_max = rolling_min_max(demand_ma5, 30)
+	diff = dem_ma5_max - dem_ma5_min
+	diff[0] = 1
+	dem_ma5_norm = (demand_ma5 - dem_ma5_min) / diff # 11
+	demand_ma12 = ema(demand, 12)[365:]
+	dem_ma12_min, dem_ma12_max = rolling_min_max(demand_ma12, 30)
+	diff = dem_ma12_max - dem_ma12_min
+	diff[0] = 1
+	dem_ma12_norm = (demand_ma12 - dem_ma12_min) / diff # 12
 	demand_now = demand[365:].copy()
 	demand_before_30 = demand[335:-30].copy()
 	delta_30 = (demand_now - demand_before_30) / (demand_before_30 * 0.25)
@@ -149,8 +168,8 @@ def demand_features(data:pd.DataFrame) -> pd.DataFrame:
 	delta_365_norm = np.tanh(delta_365) # 14
 	return pd.DataFrame({
 	'date' : return_dt,
-	'demand_ma5' : demand_ma5,
-	'demand_ma12' : demand_ma12,
+	'demand_ma5' : dem_ma5_norm,
+	'demand_ma12' : dem_ma12_norm,
 	'demand_mom' : delta_30_norm,
 	'demand_yoy' : delta_365_norm
 	})
@@ -227,12 +246,12 @@ def y_signal(data:pd.DataFrame) -> np.ndarray:
 	약 한달뒤(9개의 데이터 포인트)와 가격비교
 	"""
 	prices = data['price1'].to_numpy()
-	now_price = prices[:-9]
-	future_price = prices[9:]
+	now_price = prices[:-27]
+	future_price = prices[27:]
 	diff = future_price - now_price
 	pct_change = diff / now_price
-	return_dt = data['date'].iloc[:-9].to_numpy()
-	return return_dt, 8 * pct_change
+	return_dt = data['date'].iloc[:-27].to_numpy()
+	return return_dt, np.tanh(4 * pct_change)
 
 def get_xy(rec_path, demand_path):
 	rec_df = pd.read_csv(rec_path)
@@ -241,16 +260,16 @@ def get_xy(rec_path, demand_path):
 
 	dt_feat = date_featrues(rec_df["date"])
 	rec_feat = market_features(rec_df)
-	dem_feat = demand_features(demand_df) #TODO 여기서 문제 발생 수요 데이터 검점
+	dem_feat = demand_features(demand_df)
 	year_feat = year_unit_features(rec_feat['date'])
 	df = pd.merge(rec_feat, dt_feat, on='date', how='inner')
 	df = pd.merge(df, dem_feat, on='date', how='inner')
 	df = pd.merge(df, year_feat, on='date', how='inner')
-	seq_dt = df["date"].iloc[31:-9] # sequences length: 32, predict 9times after rec
+	seq_dt = df["date"].iloc[31:-27] # sequences length: 32, predict 27times after rec
 	df = df.drop(columns='date').to_numpy()
 	seq = np.lib.stride_tricks.sliding_window_view(df, (32, 16))
 	seq = np.squeeze(seq, axis=1)
-	seq = seq[:-9]
+	seq = seq[:-27]
 	y_dt, y_ = y_signal(rec_df)
 	y = []
 	y_dt = pd.to_datetime(y_dt)

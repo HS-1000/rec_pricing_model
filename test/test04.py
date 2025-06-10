@@ -1,3 +1,5 @@
+import sys
+sys.path.append("./")
 import features
 
 rec_path = "./data/rec.csv"
