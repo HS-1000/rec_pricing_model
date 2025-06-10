@@ -241,7 +241,7 @@ def year_unit_features(date:pd.Series):
 		'rps' : rps
 	})
 
-def y_signal(data:pd.DataFrame) -> np.ndarray:
+def y_signal(data:pd.DataFrame, mul=4) -> np.ndarray:
 	"""
 	약 한달뒤(9개의 데이터 포인트)와 가격비교
 	"""
@@ -251,7 +251,7 @@ def y_signal(data:pd.DataFrame) -> np.ndarray:
 	diff = future_price - now_price
 	pct_change = diff / now_price
 	return_dt = data['date'].iloc[:-27].to_numpy()
-	return return_dt, np.tanh(4 * pct_change)
+	return return_dt, np.tanh(mul * pct_change)
 
 def get_xy(rec_path, demand_path):
 	rec_df = pd.read_csv(rec_path)
