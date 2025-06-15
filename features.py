@@ -243,7 +243,7 @@ def year_unit_features(date:pd.Series):
 
 def y_signal(data:pd.DataFrame, mul=4) -> np.ndarray:
 	"""
-	약 한달뒤(9개의 데이터 포인트)와 가격비교
+	약 3한달뒤(27개의 데이터 포인트)와 가격비교
 	"""
 	prices = data['price1'].to_numpy()
 	now_price = prices[:-27]
@@ -254,8 +254,10 @@ def y_signal(data:pd.DataFrame, mul=4) -> np.ndarray:
 	return return_dt, np.tanh(mul * pct_change)
 
 def get_xy(rec_path, demand_path):
+	""" 앞26, 뒤27 의 타임스텝을 포함하지 않음 """
 	rec_df = pd.read_csv(rec_path)
-	rec_df.loc[rec_df.index[-1], 'price1'] = 80000
+	# 데이터 조작 테스트
+	# rec_df.loc[rec_df.index[-1], 'price1'] = 80000
 	demand_df = pd.read_csv(demand_path)
 
 	dt_feat = date_featrues(rec_df["date"])
